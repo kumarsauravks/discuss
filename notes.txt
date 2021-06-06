@@ -1,0 +1,266 @@
+Q. Phonix kya hai?
+A. Phonix ka job hai ki wo act krega as a web server, 
+   matlab ye kahi remote server me hosted hoga kisi deploymenent me. jaise AWS
+   So that user can interact with the server and receive back - html,json,web socket
+   Phonix is responsible for serving html,json,web socket . it checks the database and return data accordingly  
+   Html - text tags , image tags
+   JSon - from api source, raw data , raw json   
+   Web Sockets - used for realtime communication
+   Database - responsible for storing all kinds of data.
+
+Incoming request -> Ensures its an html request -> See if it has a session ->
+Do a security check ->Put on a HTTP headers for a browser -> See what the 
+request was trying to access -> Formulate and return a request.
+
+Commands : Create an app names discuss
+mix phx.new discuss
+cd discuss
+mix ecto.create
+mix phx.server
+
+#task1 : In the homepage add a hyperlink which will navigate us to www.google.com
+Sol : lib/discuss_web/templates/page/index.html.exx 
+
+Server side templating vs Single page app
+User visits a page -> HTTP request to server -> New HTML Document -> User clicks a link -> HTTP request to server -> New HTML Document
+User visits a page -> HTTP request to server -> New HTML Document -> React/Angular boots up, shows page -> User clicks a link -> React/Angular shows new content
+
+#task2 : Change the header which is common to every page with new one with project name.
+Sol : lib/discuss_web/templates/layout/app.html.eex
+
+Model , View , Controller
+Model 	- The raw data of the topic (its title)
+View  	- A template that takes the model and makes it look nice.
+Controlller - Figure out what the user is looking for, grabs the correct model, stffs it into the view, returns the result to the user.
+
+General flow
+				   View -> Template
+Request -> Router -> Controller -> View -> Response
+		     Controller -> Model -> Database
+Sabse pehle request gya router k pass ,router me "/" k liye ( get "/", PageController, :index ) ,page controller k index function me ( render(conn, "index.html") )
+
+---------------------------------------
+Views vs template
+html page to view k andat hona chaiye tha to wo template me kyun hai?
+Ek proper naming convention ko follow kiya ja rha hai. View me hai PageView jo template
+k Page folder ko refer kr rha hai. Controller me bhi hum PageController dekh skte hain
+yha bhi "Page" naming convention hai.
+
+Q. Check kaise kre ki views kaam kr rha hai pehle not template.
+A. iex -S mix phx.server , DiscussWeb.PageView.render("index.html")
+----------------------------------------
+Models 
+We have to instruct phonix that whenever it connects to a database , it should have a 
+table called topics which means we have to instruct phonix what data it looks into a 
+database. To tell phonix about the type of data in a database we will make use of models.
+A table contains a list/collection of data.
+
+How phonix works with list of data?
+Migration is the way though wich phonix will give instruction to postgres that the database
+should contain these data with type of data.
+
+-------------------------------------------
+mix ecto.gen.migration add_topic
+
+Now inside the migration file we need to implement the chage function:-
+def change do
+ create table(:topic) do
+  add :title, :string
+ end
+end
+
+mix ecto.migrate
+
+--------------------------------------------------
+Problems & Solutions
+P. Need a new URL for the user to visit
+S. Add a new route in our router file.
+
+P. New routes must map up to a method in a controller.
+S. Add a new method in a controller to handle this request. The method will decide what to do with the request (probably render a form)
+
+P. Need to show a form to the user
+S. Make a new template that contains the form.
+
+P. Need to translate data in the form to something that can be saved to database.
+S. Create a 'Topic' model that can translate raw data from the form into something that can be saved in the database.
+
+P. The controller and view that we currently have are related to a 'Page', but we are related to a 'Page', but we are making stuff related to a 'Topic'
+S.  Make a new controller and view to handle everything related to 'Topics'.
+
+---------------------------------------------------
+router.ex -> get "/topic/new",TopicController, :new
+
+Intent			Action			Function Name
+See the form to		Get '/topics/new'	new
+create a new topic			
+
+Submit the form to
+create a topic		Post '/topics'		create
+
+Get a list of all	Get '/topics'		index
+topics			
+
+Delete a topic with	Delete '/topics/12'	delete
+ID of 12		
+
+See the form to 	Get '/topics/12/edit'	edit
+update an existing 
+topic with ID of 12
+
+Submit the form to	Put '/topic/12'		update 
+update a topic with 
+ID of 12
+
+------------------------------------------------------
+Keyword		Purpose
+import		Takes all the functions out of this module and give them to
+		this other module
+
+alias 		Give me a shortcut to this other module , my fingers are lazy
+
+use		I want to do some really really ....really fancy setup.
+
+import :-
+defmodule Math do
+ def add(a,b), do: a+b 
+end
+defmodule TopicController do
+ import Math
+ def log, do: IO.puts "Hey"
+end
+
+TopicController.add(1,2) #3
+
+alias :-
+defmodule Math do
+ def add(a,b), do: a+b 
+end
+defmodule TopicController do
+ alias Math
+ def log, do: add(1,2)
+end
+
+TopicController.log(1,2) #3
+TopicController.add(1,2) #error
+
+--------------------------------------------------
+Q. Controller me hum ise use krte hain ..reason?? -> use DiscussWeb, :controller
+A. DiscussWeb module me import kiye hai all the required or basic for a model , view and controller.
+
+Discussion
+Jab humne router define kr k Controller me new blank fn create kiya aur 
+usi url me navigate krne lge to error mila:-
+	function DiscussWeb.TopicController.init/1 is undefined
+humne include kiya - use DiscussWeb , :controller
+	function DiscussWeb.TopicController.new/2 is undefined or private
+phir humne 2 argument wala new function create kiya..aur conn ko print kiya
+	new(conn,params)do
+	  IO.inspect conn
+	  IO.inspect params
+	end
+We get conn object is the main focal point which contains all required properties and methods.
+params object is used the parse the url , for now it is %{} ,an empty map.
+
+#task3 : in the new function of our controller just print the conn object.
+
+----------------------------------------------------
+new function me hum ek html page return krwaenge jisme ek texbox ho title add
+krne k liye aur ek button ho submit krne k liye but validation kaha likhenge 
+jisse user blank title submit na kr paaye.??? The answer is model.
+
+First create a model : discuss_web/models/topic.ex
+defmodule DiscussWeb.Topic do
+ use DiscussWeb :model
+ schema "topics" do
+  field :title, :string
+ end
+end
+
+Then we create a changeset function for the validation
+def changeset(struct,params) do
+ struct
+  |> cast(params,[:title])
+  |> validate_required([:title])
+end
+Actually changeset me value aata hai wo postgres me insert hota hai.
+
+changeset ka 1st argument struct- schema ko contain krega,
+2nd argument params- updated value ko contain krega 
+
+jab hum yha params me empty map denge to hme mesage milega ki
+title should not be blank, and valid = false.
+
+Now we have to combine the changeset and form template to make it a
+usable form, so first in controller define a changeset :-
+def new(conn,params) do
+ struct = %DiscussWeb.Topic{}
+ params = %{}
+ changeset = DiscussWeb.Topic.changeset(struct,params)
+end
+--it can be written like this :-
+alias DiscussWeb.Topic
+def new(conn,params) do
+ changeset=Topic.changeset($Topic{},%{})
+end
+
+-----------------------------------------
+Adding form to accept topic title from user
+1. In view folder add topic_view.ex
+	defmodule DiscussWeb.TopicView do
+    	 use DiscussWeb, :view
+	end
+2. In template folder add a folder topic and inside it new.html.eex
+	<h1>New Test Form</h1>
+   Also in the controller add 
+	render conn, "new.html"
+
+3. As we can see the html page in the browser with an h1 tag, now we will create 
+   a form and replace the h1 tag.
+<%= form_for @changeset, Routes.topic_path(@conn, :create), fn f -> %>
+    <div class="form-group">
+        <%= text_input f, :title,placeholder: "Title" , class: "form-control" %>
+    </div>
+
+    <%= submit "Save Topic" , class: "btn btn-primary" %>
+<% end %>
+
+---------------------------------------------
+params -> changeset -> Insert into db
+success -> show topic list ->show success
+failure -> show form -> show error
+
+Phonix depent krta hai ek open source project ecto pe
+Phonix - Model , Controller
+Ecto - Changeset, Repo
+flow - Controller <-> changeset <-> Repo <-> Postgres
+    def create(conn, %{"topic" => topic}) do
+        changeset=Topic.changeset(%Topic{},topic)
+
+        case Repo.insert(changeset) do
+            {:ok,post} -> IO.Inspect(post)
+            {:error,changeset} -> IO.inspect(changeset)
+        end
+    end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			         
+
+
+ 
+
