@@ -158,7 +158,7 @@ usi url me navigate krne lge to error mila:-
 humne include kiya - use DiscussWeb , :controller
 	function DiscussWeb.TopicController.new/2 is undefined or private
 phir humne 2 argument wala new function create kiya..aur conn ko print kiya
-	new(conn,params)do
+	new(conn,params) do
 	  IO.inspect conn
 	  IO.inspect params
 	end
