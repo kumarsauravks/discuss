@@ -8,11 +8,14 @@ A. Phonix ka job hai ki wo act krega as a web server,
    Web Sockets - used for realtime communication
    Database - responsible for storing all kinds of data.
 
+   Phonix acts as a web server , whenever user interacts with the server it checks
+    the db and returns either Html or JSON or Web_Socket
+
 Incoming request -> Ensures its an html request -> See if it has a session ->
-Do a security check ->Put on a HTTP headers for a browser -> See what the 
+Do a security check -> Put on a HTTP headers for a browser -> See what the 
 request was trying to access -> Formulate and return a request.
 
-Commands : Create an app names discuss
+Commands : Create an app named discuss
 mix phx.new discuss
 cd discuss
 mix ecto.create
@@ -31,9 +34,9 @@ Sol : lib/discuss_web/templates/layout/app.html.eex
 Model , View , Controller
 Model 	- The raw data of the topic (its title)
 View  	- A template that takes the model and makes it look nice.
-Controlller - Figure out what the user is looking for, grabs the correct model, stffs it into the view, returns the result to the user.
+Controlller - Figure out what the user is looking for, grabs the correct model, stuffs it into the view, returns the result to the user.
 
-General flow
+General flow :-
 				   View -> Template
 Request -> Router -> Controller -> View -> Response
 		     Controller -> Model -> Database
@@ -41,7 +44,7 @@ Sabse pehle request gya router k pass ,router me "/" k liye ( get "/", PageContr
 
 ---------------------------------------
 Views vs template
-html page to view k andat hona chaiye tha to wo template me kyun hai?
+html page to view k andar hona chaiye tha to wo template me kyun hai?
 Ek proper naming convention ko follow kiya ja rha hai. View me hai PageView jo template
 k Page folder ko refer kr rha hai. Controller me bhi hum PageController dekh skte hain
 yha bhi "Page" naming convention hai.

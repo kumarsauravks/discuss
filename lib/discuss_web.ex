@@ -35,8 +35,8 @@ defmodule DiscussWeb do
       import DiscussWeb.Gettext
       alias DiscussWeb.Router.Helpers, as: Routes
 
-      import Ecto
-      import Ecto.Repo
+      #import Ecto
+      #import Ecto.Repo
     end
   end
 

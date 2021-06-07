@@ -1,0 +1,72 @@
+Create a new phonix project using these commands
+    mix phx.new discuss -> create a new project
+    cd discuss -> navigate to the project
+    mix ecto.create -> create a database in your local postgres server
+    mix phx.server -> run the server ,check it in localhost:4000
+
+Create a table in your database
+    mix ecto.gen.mration add_topic -> to create a migration file.
+    goto -> priv/repo/..exs -> implement the change function and instruct it to create a table called topic in which there is a field called title
+    def change do
+        create table(:topic) do
+            add :title, :string
+        end
+    end
+
+    ecto.migrate -> used to generate the table in database.
+
+Create the controller to handle the request
+    In lib/discuss_web/controllers create a new file called topic_controller
+    defmodule DiscussWeb.TopicController do
+        use DiscussWeb, :controller
+        def new(conn,params) do
+            IO.inspect conn
+            IO.inspect params
+        end
+    end
+
+Setup the model configuration in discuss_web.ex
+    def model do
+        quote do
+        use Ecto.Schema
+
+        import Ecto
+        import Ecto.Changeset
+        import Ecto.Query
+        end
+    end
+
+Create a model folder and add the model file - topic.ex 
+    defmodule Topic do
+    use DiscussWeb, :model
+    schema "topics" do
+        field :title, :string 
+    end
+    
+    def changeset(struct,params \\ %{}) do
+        struct 
+        |> cast(params, [:title])
+        |> validate_required([:title])
+    end
+    end
+
+Using this Topic model structure modify the controller to display a insertion page
+    def new(conn,_params) do
+        changeset = Topic.changeset(%Topic{},%{})
+
+        render conn , "new.html" ,changeset:changeset
+    end
+
+First create a file called topic_view.ex inside views 
+    defmodule DiscussWeb.TopicView do
+    use DiscussWeb, :view
+    end
+
+Now create a view to display the user template/topic/new.html.eex
+<%= form_for @changeset,Routes.topic_path(@conn, :create),fn f-> %>
+    <div class="form-group">
+        <%= text_input f , :title,placeholder: "Title" ,class: "form-control" %>
+    </div>
+
+    <%= submit "Save Topic" , class: "btn btn-primary" %>
+<% end %>
