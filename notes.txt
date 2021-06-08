@@ -246,6 +246,142 @@ flow - Controller <-> changeset <-> Repo <-> Postgres
         end
     end
 
+----------------------------------------------
+To give the User a proper error message when the field is blank 
+we have to handle the error condition
+    case Repo.insert(changeset) do
+        {:ok,post} -> IO.inspect(post)
+        {:error,changeset} ->
+            render conn,"new.html",changeset:changeset
+    end
+
+To add styles to the error message we have to write css in assets/css/app.css
+.invalid-feedback {
+  text-transform: capitalize;
+}
+-------------------------------------------------
+Now we want to get a list of all the topics . Get '/topics' -> index
+To check the list of all the topics in the table through the console we have to write Discuss.Repo.all(DiscussWeb.Topic)
+Convention ki mane to list Get krne k liye hme '/topics' me :index function ko load krna chahiye but hum yha '/' me hi list ko show krenge.
+router
+    get "/" , TopicController , :index
+controller
+    def index(conn,_params) do
+        topics = Repo.all(Topic)
+
+        render conn, "index.html" , topics: topics
+    end
+template/topic/index.html.eex
+    <h2>Topics</h2>
+    <ul>
+        <%= for topic <- @topics do %>
+        <li>
+            <%= topic.title%>
+        </li>
+        <% end %>
+    </ul>
+
+----------------------------------------------------
+Now we want to redirect the user to the index page whenever user inserts a new title.
+    case Repo.insert(changeset) do
+        {:ok, post} ->
+            conn
+            |> put_flash(:info,"Topic Created")
+            |> redirect(to: Routes.topic_path(conn, :index))
+    end
+
+Below the list of topics we need to add a button to add a topic
+index.html
+    <%= link to: Routes.topic_path(@conn, :new), class: "button"  do %>Add Topic
+    <% end %>
+
+------------------------------------------------------
+Now we want to create a edit page where we can edit a particular record.
+Edit is all about showing a form - GET '/topics/12/edit' topic_path(conn,:edit,12)
+Update is all about updating a record - PUT '/topics/12' topic_path(conn,:update,12)
+
+router
+    get "/topics/:id/edit" , TopicController, :edit
+    Note: :id is the wildcard matcher
+
+controller
+    def edit(conn,%{"id" => topic_id}) do
+
+    end
+
+---------------------------------------------------------
+To implement the edit functionality we have to do
+
+controller
+    def edit(conn, %{"id" => topic_id}) do
+        topic = Repo.get(Topic.topic_id) 
+        changeset = Topic.changeset(topic)
+
+        render conn, "edit.html" , changeset: changeset, topic: topic
+    end
+
+edit.html
+    <%= form_for @changeset, Routes.topic_path(@conn, :update, @topic), fn f -> %>
+        <div class="form-group">
+            <%= text_input f, :title, placeholder: "Title" , class: "form-control" %>
+            <%= error_tag f, :title %>
+        </div>
+
+        <%= submit "Save Topic", class: "btn btn-primary" %>
+    <% end %>
+
+route
+    put "/topics/:id" , TopicController, :update 
+
+--------------------------------------------------------------
+Now We have to implement the update functionality
+
+    def update(conn, %{"id" => topic_id, "topic" => topic}) do
+        old_topic = Repo.get(Topic, topic_id)
+        changeset= Topic.changeset(old_topic,topic)
+
+        #changeset=Repo.get(Topic,topic_id) |> Topic.changeset(topic)
+
+        case Repo.update(changeset) do
+            {:ok, _topic} ->
+                conn
+                |> put_flash(:info , "Topic Updated")
+                |> redirect(to: Routes.topic_path(conn, :index))
+            {:error, changeset} ->
+                render conn , "edit.html" , changeset: changeset , topic: old_topic
+        end
+    end
+
+-----------------------------------------------------------------
+Resource helper - As we are using the proper convention
+    get "/" , TopicController , :index
+    get "/topics/new",TopicController, :new
+    post "/topics",TopicController, :create
+    get "/topics/:id/edit" , TopicController, :edit
+    put "/topics/:id" ,TopicController, :update
+
+We can replace all of these with
+    resources "/" , TopicController
+
+-----------------------------------------------------------------
+Deleting a record
+controller
+    def delete(conn,%{"id"=> topic_id}) do
+        Repo.get!(Topic,topic_id) |> Repo.delete!
+
+        conn
+        |> put_flash(:info, "Topic Deleted")
+        |> redirect(to: Routes.topic_path(conn,:index))
+    end
+
+index.html
+    <div class="float-right">
+        <%= link "Delete" , to: Routes.topic_path(@conn , :delete , topic) , method: :delete %>
+    /div>
+
+
+
+
 
 
 
