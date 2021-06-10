@@ -379,6 +379,61 @@ index.html
         <%= link "Delete" , to: Routes.topic_path(@conn , :delete , topic) , method: :delete %>
     /div>
 
+------------------------------------------------------------------
+Oauth - Open Authentication 
+In this project we will use github Oauth
+Jab user click krega signIn with github , wo redirect ho jayega github k page me , git k page me user ko login krna padega
+agar wo successfully login kr leta hai to us user ka information like name email github se return kr diya jata hai aur again usko 
+base url pe redirect kr diya jata hai with a session
+
+To configure oauth in your application we first need to include two dependencies in mix.exs file
+    {:ueberauth, "~> 0.3"},
+    {:ueberauth_github, "~> 0.4"}
+
+Run the command : mix deps.get
+
+Search for -> ueberauth
+
+Now we have to setup a key in github 
+    go to github.com -> Setting -> Developers Settings -> OAuth App -> Register a new OAuth application
+    Name : Practice App
+    Homepage Url : http://localhost:4000
+    Application Descrirption : OAuth Practice
+    Authorization callback URL : http://localhost:4000/auth/github/callback
+
+After creation  we will get 
+    Client ID : b278f067b0ff239488bb
+    Client Secret : 642c2da7aa4c263186eb3db8a1079b141d4de173
+
+Now Modify the config.exs 
+    config :ueberauth, Ueberauth,
+    providers: [
+        github: {Ueberauth.Strategy.Github, [] }
+    ]
+
+    config :ueberauth, Uberauth.Stategy.Github.Oauth,
+        client_id: "b278f067b0ff239488bb" ,
+        client_secret: "642c2da7aa4c263186eb3db8a1079b141d4de173"
+
+Now We have to setup our controller
+Create a auth_controller.ex
+    defmodule DiscussWeb.AuthController do
+        use DiscussWeb , :controller
+        plug UeberAuth
+        
+        def callback(conn, params) do
+            IO.puts "++++"
+            IO.inspect(conn,assigns)
+            IO.puts "++++"
+            IO.inspect(params)
+        end
+    end
+
+
+
+
+
+
 
 
 
