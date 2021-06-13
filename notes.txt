@@ -429,6 +429,47 @@ Create a auth_controller.ex
         end
     end
 
+To navigate to the github for authentication we have to set the route first
+scope "/auth" , DiscussWeb do
+    pipe_through :browser
+
+    get "/:provider" , AuthController, :request
+    get "/:provider/callback" , AuthController, :callback
+  end
+
+To store the user of github in database we have to create a migration.
+mix ecto.gen.migration add_users
+In the migration file we have to implement the change function
+    def change do 
+        create table(:users) do
+        add :email, :string
+        add :provider, :string
+        add :token, :string
+
+        timestamps()
+        end
+    end
+
+Now we have to create a model so that phonix will now get the knowldge of the table
+defmodule DiscussWeb.User do
+    use DiscussWeb, :model
+
+    schema "users" do
+        field :email, :string
+        field :provider, :string
+        field :token , :string
+
+        timestamps()
+    end
+
+    def changeset(struct, params \\ %{}) do
+        struct
+        |> cast(params, [:email, :provider, :token])
+        |> validate_required([:email, :provider , :token])
+    end
+end
+
+
 
 
 
