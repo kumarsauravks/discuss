@@ -406,14 +406,14 @@ After creation  we will get
     Client Secret : 642c2da7aa4c263186eb3db8a1079b141d4de173
 
 Now Modify the config.exs 
-    config :ueberauth, Ueberauth,
-    providers: [
-        github: {Ueberauth.Strategy.Github, [] }
-    ]
+ config :ueberauth, Ueberauth,
+  providers: [
+    github: {Ueberauth.Strategy.Github, [default_scope: "user , user:email , public_repo"] }
+  ]
 
-    config :ueberauth, Uberauth.Stategy.Github.Oauth,
-        client_id: "b278f067b0ff239488bb" ,
-        client_secret: "642c2da7aa4c263186eb3db8a1079b141d4de173"
+config :ueberauth, Ueberauth.Strategy.Github.OAuth,
+  client_id: "b278f067b0ff239488bb" ,
+  client_secret: "642c2da7aa4c263186eb3db8a1079b141d4de173"
 
 Now We have to setup our controller
 Create a auth_controller.ex
@@ -468,6 +468,262 @@ defmodule DiscussWeb.User do
         |> validate_required([:email, :provider , :token])
     end
 end
+
+Finally we have to change the AuthController
+ def callback(%{assigns: %{ueberauth_auth: auth}}=conn,params) do
+    user_params = %{token: auth.credentials.token, email: auth.info.email , provider: "github"}
+
+    changeset = User.changeset(%User{}, user_params)
+
+    signin(conn,changeset)
+  end
+
+  defp signin(conn,changeset) do
+    case insert_or_update_user(changeset) do
+      {:ok, user} ->
+        conn
+        |> put_flash(:info, "Welcome back")
+        |> put_session(:user_id, user.id)
+        |> redirect(to: Routes.topic_path(conn, :index))
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "Error signing in")
+        |> redirect(to: Routes.topic_path(conn, :index))
+    end
+  end
+
+  defp insert_or_update_user(changeset) do
+   case Repo.get_by(User,email: changeset.changes.email) do
+    nil -> 
+      Repo.insert(changeset)
+    user -> 
+      {:ok, user}
+   end
+  end
+
+-----------------------------------
+Plugs :-
+Introduction to Plugs
+Jab hum signin ho jate hain to pure application ko kaise pta lgega ki hum sign in hain . 
+Har bar hume session me jakr check krna hoga ki hum signin hai ya nhi.
+
+humlog ek helper module bnayenge jo hme authentication process me help krega.
+Plug has a function that does a tiny transformaion to the conn object 
+Actually hum jo bhi function bna rhe hain controller me usme bhi hum conn object ko as a 
+first argument le rhe hain kuch transformation kr rhe hain aur finnaly use return kr rhe hain .Plug hi to hai.
+
+2 type k plug hote hai -> 1. module plugs , 2. fuction plugs
+    module plug me 2 function hote hain init and call 
+        init - does some setup
+        call - called with a conn , must return a conn
+
+hum ye check krne k liye ki user does sign in - create a plug
+we will create a "module plug" bcoz hum different controller k sath ise use kr payen.
+===============
+Implementing Module Plug
+Create A Plug in controllers/pliug/set_user.ex
+defmodule Discuss.Plug.SetUser do
+    import Plug.Conn
+    import Phonix.Controller
+
+    alias Discuss.Repo
+    alias DiscussWeb.User
+
+    def init(_params) do
+
+    end
+
+    def call(conn,_params) do
+        user_id = get_session(conn, :user_id)
+
+        cond do
+            user= user_id && Repo.get(User, user_id) ->
+                assign(conn, :user,user)
+                # conn.assigns.user => user struct
+            true ->
+                assign(conn, :user,nil)
+        end
+    end
+end
+
+include the plug in router file
+ pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_flash
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+
+    plug Discuss.Plug.SetUser
+  end
+
+Add the login button
+        <ul style="float:right">
+            <%= if @conn.assigns[:user] do %>
+              <li>
+                <span style="color:white">Logout </span>
+              </li>
+            <% else %>
+              <li>
+                <%= link "Sign in with Github", to: Routes.auth_path(@conn, :request , "github")  %>
+              </li>
+              <% end %>
+        </ul>
+
+=========
+Allowing User to signout
+- first we will modify the router file
+ scope "/auth" , DiscussWeb do
+    pipe_through :browser
+
+    get "/signout", AuthController, :signout
+  end
+
+  **Note** This route should be the first.
+
+- second we have to create a signout function in auth_controller
+ def signout(conn, _params) do
+      conn 
+      |> configure_session(drop: true)
+      |> redirect(to: Routes.topic_path(conn, :index))
+  end
+
+- third we need to change the app.html.eex file
+<%= link "Sign Out", to: Routes.auth_path(@conn, :signout) %>
+
+==========
+Restricting access to users
+ User tries to create or modify Topic 
+            | Always
+            V 
+ Are they signed in? 
+            | Sometimes
+            V 
+ Do they own the post 
+            |
+            V
+  Let them do it.
+
+===========
+RequireAuth Plug
+- Create a plug in controller/plugs/require_auth.ex
+defmodule Discuss.Plugs.RequireAuth do
+    import Plug.Conn
+    import Phoenix.Controller
+
+    alias DiscussWeb.Router.Helpers
+
+    def init(_params) do
+
+    end
+
+    def call(conn, _params) do
+        if conn.assigns[:user] do
+            conn
+        else
+            conn
+            |> put_flash(:error, "You must be logged in.")
+            |> redirect(to: Helpers.topic_path(conn, :index))
+            |> halt()
+        end
+    end
+end
+
+-use the plug in topic controller and restrict the user to access add, edit and delete functionality
+    plug Discuss.Plugs.RequireAuth when action in [:new , :create , :edit , :update , :delete]
+
+=================
+Associating Users with Topics 
+- Table     Fields
+  Topics    Id , title 
+  Users     Id , email , token , provider
+
+Abi ye dono table me koi relation nhi hai to hme nhi pta hai kis user ne kon si topic create ki.
+Iske liye hme relation bnana hoga . Jaise One User can create multiple topics (one to many) , many topic is related to on e single user (many to one)
+So the table should look like :-
+- Table     Fields
+  Topics    Id , title , user_id
+  Users     Id , email , token , provider
+
+- First we need to create a migration to modify the topic table
+    mix ecto.gen.migration add_user_id_to_topics
+    
+    alter table(:topics) do
+      add :user_id , references(:users)
+    end
+
+    mix ecto.migrate 
+- Next we have to change thw schema of user and topic
+    schema "users" do
+        field :email, :string
+        field :provider, :string
+        field :token , :string
+
+        has_many :topics. DiscussWeb.Topic
+
+        timestamps()
+    end
+
+    schema "topics" do
+        field :title, :string
+        belongs_to :user, DiscussWeb.User
+    end
+
+    **Test**  Discuss.Repo.get(DiscussWeb.User,1);
+- Now whenever a new topic is created we want the topic to be associated with the current user.
+  Therefore we will modify the create function of our topic controller
+  def create(conn, %{"topic" => topic}) do
+    changeset=conn.assigns.user
+        |> build_assoc(:topics)
+        |> Topic.changeset(topic)
+    ...
+  end
+
+- To show the edit/delete button associated to the particular user we need to modify the index.html.eex
+    <%= if @conn.assigns.user.id == topic.user_id do %>
+        <div class="float-right">
+            <%= link "Edit" , to: Routes.topic_path(@conn, :edit, topic) %>
+            <%= link "Delete" , to: Routes.topic_path(@conn , :delete , topic) , method: :delete %>
+        </div>
+    <% end %>
+
+- To increase the security that the owner of ther topic can only update or delete his topic we will implement a "function plug" in our topic controller.
+    plug :check_topic_owner when action in [:update, :edit, :delete]
+
+    def check_topic_owner(conn, _params) do
+        %{params: %{"id" => topic_id}} = conn
+
+        if Repo.get(Topic, topic_id).user_id == conn.assigns.user.id do
+            conn
+        else
+            conn
+            |> put_flash(:error, "You cannot edit that")
+            |> redirect(to: Routes.topic_path(conn, :index))
+            |> halt()
+        end
+    end
+
+    **Test**: http://localhost:4000/7/edit  -> http://localhost:4000/3/edit
+
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
